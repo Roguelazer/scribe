@@ -59,6 +59,10 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
     return maxQueueSize;
   }
 
+  inline unsigned long long getMaxTotalQueueSize() {
+    return maxTotalQueueSize;
+  }
+
   inline const StoreConf& getConfig() const {
     return config;
   }
@@ -98,6 +102,7 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
   unsigned long maxMsgPerSecond;
   unsigned long maxConn;
   unsigned long long maxQueueSize;
+  unsigned long long maxTotalQueueSize;
   StoreConf config;
   bool newThreadPerCategory;
 

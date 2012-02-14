@@ -39,6 +39,7 @@ shared_ptr<scribeHandler> g_Handler;
 #define DEFAULT_CHECK_PERIOD       5
 #define DEFAULT_MAX_MSG_PER_SECOND 0
 #define DEFAULT_MAX_QUEUE_SIZE     5000000LL
+#define DEFAULT_MAX_TOT_QUEUE_SIZE 0
 #define DEFAULT_SERVER_THREADS     3
 #define DEFAULT_MAX_CONN           0
 
@@ -134,6 +135,7 @@ scribeHandler::scribeHandler(unsigned long int server_port, const std::string& c
     maxMsgPerSecond(DEFAULT_MAX_MSG_PER_SECOND),
     maxConn(DEFAULT_MAX_CONN),
     maxQueueSize(DEFAULT_MAX_QUEUE_SIZE),
+    maxTotalQueueSize(DEFAULT_MAX_TOT_QUEUE_SIZE),
     newThreadPerCategory(true) {
   time(&lastMsgTime);
   scribeHandlerLock = scribe::concurrency::createReadWriteMutex();
@@ -289,6 +291,7 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   // This is a simplification based on the assumption that most Log() calls contain most
   // categories.
   unsigned long long max_count = 0;
+  unsigned long long total_queue_size = 0;
   for (category_map_t::iterator cat_iter = categories.begin();
        cat_iter != categories.end();
        ++cat_iter) {
@@ -303,11 +306,16 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
         throw std::logic_error("throttle check: iterator in store map holds null pointer");
       } else {
         unsigned long long size = (*store_iter)->getSize();
+        total_queue_size += size;
         if (size > maxQueueSize) {
           incCounter((*store_iter)->getCategoryHandled(), "denied for queue size");
           return true;
         }
       }
+    }
+    if ((maxTotalQueueSize > 0) && (total_queue_size > maxTotalQueueSize)) {
+      incCounter("denied for overall rate");
+      return true;
     }
   }
 
@@ -560,6 +568,7 @@ void scribeHandler::initialize() {
     // load the global config
     config.getUnsigned("max_msg_per_second", maxMsgPerSecond);
     config.getUnsignedLongLong("max_queue_size", maxQueueSize);
+    config.getUnsignedLongLong("max_total_queue_size", maxTotalQueueSize);
     config.getUnsigned("check_interval", checkPeriod);
     if (checkPeriod == 0) {
       checkPeriod = 1;
